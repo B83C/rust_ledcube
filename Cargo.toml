@@ -1,0 +1,15 @@
+[package]
+name = "rust_ledcube"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+cortex-m = { version = "0.7.7", features = ["inline-asm"] }
+cortex-m-rt = "0.7.3"
+nb = "1.1.0"
+panic-probe = { version = "0.3.1", features = ["rtt-target"] }
+rtic = { version = "2.0.0-alpha.2", features = ["cortex-m", "thumbv7-backend"] }
+rtt-target = "0.4.0"
+stm32f4xx-hal = { version = "0.16.0", features = ["stm32f407", "rtic"] }

@@ -14,6 +14,7 @@ rtic = { version = "2.0.0-alpha.2", features = ["cortex-m", "thumbv7-backend"] }
 rtt-target = "0.4.0"
 seq-macro = "0.3.3"
 stm32f4xx-hal = { version = "0.16.0", features = ["stm32f407", "rtic"] }
+tinybmp = "0.5.0"
 tuple-iter = "0.1.0"
 
 [profile.release]

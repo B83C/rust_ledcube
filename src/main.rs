@@ -26,7 +26,7 @@ mod app {
             TIM9,
         },
         timer::Channel::*,
-        timer::Channel1,
+        timer::{Channel1, Polarity},
         timer::{Channel2, PwmHz},
         timer::{Channel3, Event},
         timer::{Channel4, CounterHz},
@@ -35,7 +35,13 @@ mod app {
 
     use super::*;
 
-    static fbpool: [[u32; 16 * 16 * 16]; 2] = [[0xFFFFFFu32; 16 * 16 * 16]; 2];
+    const fn image_load() -> [[u32; 16 * 16 * 16]; 2] {
+        let test = [[0u32; 16 * 16 * 16]; 2];
+        // test[0].copy_from_slice(include_bytes!(r"..\image.bmp").into());
+        test
+    }
+
+    static FBPOOL: [[u32; 16 * 16 * 16]; 2] = image_load();
 
     #[shared]
     struct Shared {
@@ -75,107 +81,337 @@ mod app {
         let gpioe = dp.GPIOE.split();
 
         //256 ARR
-        let hertz = (168000000 >> 8).Hz();
+        // APB1 operates at 168/2 MHz whereas APB2 operates at 168 MHz
+        let hertz_apb1 = (clocks.hclk().raw() >> 9).Hz();
+        let hertz_apb2 = (clocks.hclk().raw() >> 8).Hz();
 
-        _ = dp.TIM1.pwm_hz(
+        let mut tim1 = dp.TIM1.pwm_hz(
             (
-                Channel1::new(gpioa.pa8.into_push_pull_output_in_state(PinState::Low)),
-                Channel2::new(gpioa.pa9.into_push_pull_output_in_state(PinState::Low)),
-                Channel3::new(gpioa.pa10.into_push_pull_output_in_state(PinState::Low)),
-                Channel4::new(gpioe.pe14.into_push_pull_output_in_state(PinState::Low)),
+                Channel1::new(
+                    gpioa
+                        .pa8
+                        .into_push_pull_output_in_state(PinState::Low)
+                        .into_alternate(),
+                ),
+                Channel2::new(
+                    gpioa
+                        .pa9
+                        .into_push_pull_output_in_state(PinState::Low)
+                        .into_alternate(),
+                ),
+                Channel3::new(
+                    gpioa
+                        .pa10
+                        .into_push_pull_output_in_state(PinState::Low)
+                        .into_alternate(),
+                ),
+                Channel4::new(
+                    gpioe
+                        .pe14
+                        .into_push_pull_output_in_state(PinState::Low)
+                        .into_alternate(),
+                ),
             ),
-            hertz,
+            hertz_apb2,
             &clocks,
         );
-        _ = dp.TIM2.pwm_hz(
+        let mut tim2 = dp.TIM2.pwm_hz(
             (
-                Channel1::new(gpioa.pa5.into_push_pull_output_in_state(PinState::Low)),
-                Channel2::new(gpiob.pb3.into_push_pull_output_in_state(PinState::Low)),
-                Channel3::new(gpiob.pb10.into_push_pull_output_in_state(PinState::Low)),
-                Channel4::new(gpiob.pb11.into_push_pull_output_in_state(PinState::Low)),
+                Channel1::new(
+                    gpioa
+                        .pa5
+                        .into_push_pull_output_in_state(PinState::Low)
+                        .into_alternate(),
+                ),
+                Channel2::new(
+                    gpiob
+                        .pb3
+                        .into_push_pull_output_in_state(PinState::Low)
+                        .into_alternate(),
+                ),
+                Channel3::new(
+                    gpiob
+                        .pb10
+                        .into_push_pull_output_in_state(PinState::Low)
+                        .into_alternate(),
+                ),
+                Channel4::new(
+                    gpiob
+                        .pb11
+                        .into_push_pull_output_in_state(PinState::Low)
+                        .into_alternate(),
+                ),
             ),
-            hertz,
+            hertz_apb1,
             &clocks,
         );
-        _ = dp.TIM3.pwm_hz(
+        let mut tim3 = dp.TIM3.pwm_hz(
             (
-                Channel1::new(gpiob.pb4.into_push_pull_output_in_state(PinState::Low)),
-                Channel2::new(gpiob.pb5.into_push_pull_output_in_state(PinState::Low)),
-                Channel3::new(gpiob.pb0.into_push_pull_output_in_state(PinState::Low)),
-                Channel4::new(gpiob.pb1.into_push_pull_output_in_state(PinState::Low)),
+                Channel1::new(
+                    gpiob
+                        .pb4
+                        .into_push_pull_output_in_state(PinState::Low)
+                        .into_alternate(),
+                ),
+                Channel2::new(
+                    gpiob
+                        .pb5
+                        .into_push_pull_output_in_state(PinState::Low)
+                        .into_alternate(),
+                ),
+                Channel3::new(
+                    gpiob
+                        .pb0
+                        .into_push_pull_output_in_state(PinState::Low)
+                        .into_alternate(),
+                ),
+                Channel4::new(
+                    gpiob
+                        .pb1
+                        .into_push_pull_output_in_state(PinState::Low)
+                        .into_alternate(),
+                ),
             ),
-            hertz,
+            hertz_apb1,
             &clocks,
         );
 
-        _ = dp.TIM4.pwm_hz(
+        let mut tim4 = dp.TIM4.pwm_hz(
             (
-                Channel1::new(gpiob.pb6.into_push_pull_output_in_state(PinState::Low)),
-                Channel2::new(gpiob.pb7.into_push_pull_output_in_state(PinState::Low)),
-                Channel3::new(gpiod.pd14.into_push_pull_output_in_state(PinState::Low)),
-                Channel4::new(gpiod.pd15.into_push_pull_output_in_state(PinState::Low)),
+                Channel1::new(
+                    gpiob
+                        .pb6
+                        .into_push_pull_output_in_state(PinState::Low)
+                        .into_alternate(),
+                ),
+                Channel2::new(
+                    gpiob
+                        .pb7
+                        .into_push_pull_output_in_state(PinState::Low)
+                        .into_alternate(),
+                ),
+                Channel3::new(
+                    gpiod
+                        .pd14
+                        .into_push_pull_output_in_state(PinState::Low)
+                        .into_alternate(),
+                ),
+                Channel4::new(
+                    gpiod
+                        .pd15
+                        .into_push_pull_output_in_state(PinState::Low)
+                        .into_alternate(),
+                ),
             ),
-            hertz,
+            hertz_apb1,
             &clocks,
         );
 
-        _ = dp.TIM5.pwm_hz(
+        let mut tim5 = dp.TIM5.pwm_hz(
             (
-                Channel1::new(gpioa.pa0.into_push_pull_output_in_state(PinState::Low)),
-                Channel2::new(gpioa.pa1.into_push_pull_output_in_state(PinState::Low)),
-                Channel3::new(gpioa.pa2.into_push_pull_output_in_state(PinState::Low)),
-                Channel4::new(gpioa.pa3.into_push_pull_output_in_state(PinState::Low)),
+                Channel1::new(
+                    gpioa
+                        .pa0
+                        .into_push_pull_output_in_state(PinState::Low)
+                        .into_alternate(),
+                ),
+                Channel2::new(
+                    gpioa
+                        .pa1
+                        .into_push_pull_output_in_state(PinState::Low)
+                        .into_alternate(),
+                ),
+                Channel3::new(
+                    gpioa
+                        .pa2
+                        .into_push_pull_output_in_state(PinState::Low)
+                        .into_alternate(),
+                ),
+                Channel4::new(
+                    gpioa
+                        .pa3
+                        .into_push_pull_output_in_state(PinState::Low)
+                        .into_alternate(),
+                ),
             ),
-            hertz,
+            hertz_apb1,
             &clocks,
         );
 
-        _ = dp.TIM8.pwm_hz(
+        let mut tim8 = dp.TIM8.pwm_hz(
             (
-                Channel1::new(gpioc.pc6.into_push_pull_output_in_state(PinState::Low)),
-                Channel2::new(gpioc.pc7.into_push_pull_output_in_state(PinState::Low)),
-                Channel3::new(gpioc.pc8.into_push_pull_output_in_state(PinState::Low)),
-                Channel4::new(gpioc.pc9.into_push_pull_output_in_state(PinState::Low)),
+                Channel1::new(
+                    gpioc
+                        .pc6
+                        .into_push_pull_output_in_state(PinState::Low)
+                        .into_alternate(),
+                ),
+                Channel2::new(
+                    gpioc
+                        .pc7
+                        .into_push_pull_output_in_state(PinState::Low)
+                        .into_alternate(),
+                ),
+                Channel3::new(
+                    gpioc
+                        .pc8
+                        .into_push_pull_output_in_state(PinState::Low)
+                        .into_alternate(),
+                ),
+                Channel4::new(
+                    gpioc
+                        .pc9
+                        .into_push_pull_output_in_state(PinState::Low)
+                        .into_alternate(),
+                ),
             ),
-            hertz,
+            hertz_apb2,
             &clocks,
         );
-        _ = dp.TIM9.pwm_hz(
+        let mut tim9 = dp.TIM9.pwm_hz(
             (
-                Channel1::new(gpioe.pe5.into_push_pull_output_in_state(PinState::Low)),
-                Channel2::new(gpioe.pe6.into_push_pull_output_in_state(PinState::Low)),
+                Channel1::new(
+                    gpioe
+                        .pe5
+                        .into_push_pull_output_in_state(PinState::Low)
+                        .into_alternate(),
+                ),
+                Channel2::new(
+                    gpioe
+                        .pe6
+                        .into_push_pull_output_in_state(PinState::Low)
+                        .into_alternate(),
+                ),
             ),
-            hertz,
+            hertz_apb1,
             &clocks,
         );
-        _ = dp.TIM10.pwm_hz(
-            Channel1::new(gpiob.pb8.into_push_pull_output_in_state(PinState::Low)),
-            hertz,
+        let mut tim10 = dp.TIM10.pwm_hz(
+            Channel1::new(
+                gpiob
+                    .pb8
+                    .into_push_pull_output_in_state(PinState::Low)
+                    .into_alternate(),
+            ),
+            hertz_apb1,
             &clocks,
         );
-        _ = dp.TIM11.pwm_hz(
-            Channel1::new(gpiob.pb9.into_push_pull_output_in_state(PinState::Low)),
-            hertz,
+        let mut tim11 = dp.TIM11.pwm_hz(
+            Channel1::new(
+                gpiob
+                    .pb9
+                    .into_push_pull_output_in_state(PinState::Low)
+                    .into_alternate(),
+            ),
+            hertz_apb1,
             &clocks,
         );
-        _ = dp.TIM12.pwm_hz(
+        let mut tim12 = dp.TIM12.pwm_hz(
             (
-                Channel1::new(gpiob.pb14.into_push_pull_output_in_state(PinState::Low)),
-                Channel2::new(gpiob.pb15.into_push_pull_output_in_state(PinState::Low)),
+                Channel1::new(
+                    gpiob
+                        .pb14
+                        .into_push_pull_output_in_state(PinState::Low)
+                        .into_alternate(),
+                ),
+                Channel2::new(
+                    gpiob
+                        .pb15
+                        .into_push_pull_output_in_state(PinState::Low)
+                        .into_alternate(),
+                ),
             ),
-            hertz,
+            hertz_apb1,
             &clocks,
         );
-        _ = dp.TIM13.pwm_hz(
-            Channel1::new(gpioa.pa6.into_push_pull_output_in_state(PinState::Low)),
-            hertz,
+        let mut tim13 = dp.TIM13.pwm_hz(
+            Channel1::new(
+                gpioa
+                    .pa6
+                    .into_push_pull_output_in_state(PinState::Low)
+                    .into_alternate(),
+            ),
+            hertz_apb1,
             &clocks,
         );
-        _ = dp.TIM14.pwm_hz(
-            Channel1::new(gpioa.pa7.into_push_pull_output_in_state(PinState::Low)),
-            hertz,
+        let mut tim14 = dp.TIM14.pwm_hz(
+            Channel1::new(
+                gpioa
+                    .pa7
+                    .into_push_pull_output_in_state(PinState::Low)
+                    .into_alternate(),
+            ),
+            hertz_apb1,
             &clocks,
         );
+
+        tim1.enable(C1);
+        tim1.set_polarity(C1, Polarity::ActiveLow);
+        tim1.enable(C2);
+        tim1.set_polarity(C2, Polarity::ActiveLow);
+        tim1.enable(C3);
+        tim1.set_polarity(C3, Polarity::ActiveLow);
+        tim1.enable(C4);
+        tim1.set_polarity(C4, Polarity::ActiveLow);
+        tim2.enable(C1);
+        tim2.set_polarity(C1, Polarity::ActiveLow);
+        tim2.enable(C2);
+        tim2.set_polarity(C2, Polarity::ActiveLow);
+        tim2.enable(C3);
+        tim2.set_polarity(C3, Polarity::ActiveLow);
+        tim2.enable(C4);
+        tim2.set_polarity(C4, Polarity::ActiveLow);
+        tim3.enable(C1);
+        tim3.set_polarity(C1, Polarity::ActiveLow);
+        tim3.enable(C2);
+        tim3.set_polarity(C2, Polarity::ActiveLow);
+        tim3.enable(C3);
+        tim3.set_polarity(C3, Polarity::ActiveLow);
+        tim3.enable(C4);
+        tim3.set_polarity(C4, Polarity::ActiveLow);
+        tim4.enable(C1);
+        tim4.set_polarity(C1, Polarity::ActiveLow);
+        tim4.enable(C2);
+        tim4.set_polarity(C2, Polarity::ActiveLow);
+        tim4.enable(C3);
+        tim4.set_polarity(C3, Polarity::ActiveLow);
+        tim4.enable(C4);
+        tim4.set_polarity(C4, Polarity::ActiveLow);
+        tim5.enable(C1);
+        tim5.set_polarity(C1, Polarity::ActiveLow);
+        tim5.enable(C2);
+        tim5.set_polarity(C2, Polarity::ActiveLow);
+        tim5.enable(C3);
+        tim5.set_polarity(C3, Polarity::ActiveLow);
+        tim5.enable(C4);
+        tim5.set_polarity(C4, Polarity::ActiveLow);
+        tim8.enable(C1);
+        tim8.set_polarity(C1, Polarity::ActiveLow);
+        tim8.enable(C2);
+        tim8.set_polarity(C2, Polarity::ActiveLow);
+        tim8.enable(C3);
+        tim8.set_polarity(C3, Polarity::ActiveLow);
+        tim8.enable(C4);
+        tim8.set_polarity(C4, Polarity::ActiveLow);
+        tim9.enable(C1);
+        tim9.set_polarity(C1, Polarity::ActiveLow);
+        tim9.enable(C2);
+        tim9.set_polarity(C2, Polarity::ActiveLow);
+        tim10.enable(C1);
+        tim10.set_polarity(C1, Polarity::ActiveLow);
+        tim11.enable(C1);
+        tim11.set_polarity(C1, Polarity::ActiveLow);
+        tim12.enable(C1);
+        tim12.set_polarity(C1, Polarity::ActiveLow);
+        tim12.enable(C2);
+        tim12.set_polarity(C2, Polarity::ActiveLow);
+        tim13.enable(C1);
+        tim13.set_polarity(C1, Polarity::ActiveLow);
+        tim14.enable(C1);
+        tim14.set_polarity(C1, Polarity::ActiveLow);
+
+        // tim13.set_polarity(C1, hal::timer::Polarity::ActiveLow);
+        // tim13.enable(C1);
 
         seq!(N in 0..10{
         _ = gpiod.pd~N.into_push_pull_output();
@@ -193,7 +429,7 @@ mod app {
         (
             Shared {
                 frame_offset: 0,
-                buf: &fbpool[0],
+                buf: &FBPOOL[0],
             },
             Local {
                 en: 0,

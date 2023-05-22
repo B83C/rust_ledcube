@@ -1,5 +1,5 @@
 #![no_std]
-#![feature(wrapping_next_power_of_two)]
+#![feature(type_alias_impl_trait)]
 #![no_main]
 
 use panic_probe as _;
@@ -19,6 +19,7 @@ mod app {
         slice::{ChunksExact, Iter},
     };
 
+    use embedded_graphics::prelude::*;
     use hal::{
         gpio::PinState,
         pac::{
@@ -31,12 +32,16 @@ mod app {
         timer::{Channel3, Event},
         timer::{Channel4, CounterHz},
     };
+    use rtic_monotonics::systick::*;
     use rtt_target::rdbg;
+    use tinybmp::Bmp;
 
     use super::*;
 
     const fn image_load() -> [[u32; 16 * 16 * 16]; 2] {
-        let test = [[0u32; 16 * 16 * 16]; 2];
+        let test = [[0xFFFFFFu32; 16 * 16 * 16]; 2];
+        // let bmp: Bmp<embedded_graphics::pixelcolor::Rgb565> =
+        //     Bmp::from_slice(include_bytes!(r"../image.bmp")).unwrap();
         // test[0].copy_from_slice(include_bytes!(r"..\image.bmp").into());
         test
     }
@@ -45,9 +50,7 @@ mod app {
 
     #[shared]
     struct Shared {
-        #[lock_free]
         frame_offset: usize,
-        #[lock_free]
         buf: &'static [u32],
         // #[lock_free]
         // fbu: Cycle<Flatten<StepBy<ChunksExact<'static, u32>>>>,
@@ -56,11 +59,9 @@ mod app {
     }
 
     #[local]
-    struct Local {
-        en: u8,
-        port: u8,
-        timer7: CounterHz<TIM7>,
-    }
+    struct Local {}
+
+    const row_update_rate: u32 = (16 * 8 * 120);
 
     /// STM32 Init code
     #[init]
@@ -69,6 +70,8 @@ mod app {
 
         rprintln!("STM32 LED CUBE");
 
+        let systick_token = rtic_monotonics::create_systick_token!();
+        Systick::start(ctx.core.SYST, 168_000_000, systick_token);
         let dp = ctx.device;
 
         let rcc = dp.RCC.constrain();
@@ -87,90 +90,30 @@ mod app {
 
         let mut tim1 = dp.TIM1.pwm_hz(
             (
-                Channel1::new(
-                    gpioa
-                        .pa8
-                        .into_push_pull_output_in_state(PinState::Low)
-                        .into_alternate(),
-                ),
-                Channel2::new(
-                    gpioa
-                        .pa9
-                        .into_push_pull_output_in_state(PinState::Low)
-                        .into_alternate(),
-                ),
-                Channel3::new(
-                    gpioa
-                        .pa10
-                        .into_push_pull_output_in_state(PinState::Low)
-                        .into_alternate(),
-                ),
-                Channel4::new(
-                    gpioe
-                        .pe14
-                        .into_push_pull_output_in_state(PinState::Low)
-                        .into_alternate(),
-                ),
+                Channel1::new(gpioa.pa8.into_alternate()),
+                Channel2::new(gpioa.pa9.into_alternate()),
+                Channel3::new(gpioa.pa10.into_alternate()),
+                Channel4::new(gpioe.pe14.into_alternate()),
             ),
             hertz_apb2,
             &clocks,
         );
         let mut tim2 = dp.TIM2.pwm_hz(
             (
-                Channel1::new(
-                    gpioa
-                        .pa5
-                        .into_push_pull_output_in_state(PinState::Low)
-                        .into_alternate(),
-                ),
-                Channel2::new(
-                    gpiob
-                        .pb3
-                        .into_push_pull_output_in_state(PinState::Low)
-                        .into_alternate(),
-                ),
-                Channel3::new(
-                    gpiob
-                        .pb10
-                        .into_push_pull_output_in_state(PinState::Low)
-                        .into_alternate(),
-                ),
-                Channel4::new(
-                    gpiob
-                        .pb11
-                        .into_push_pull_output_in_state(PinState::Low)
-                        .into_alternate(),
-                ),
+                Channel1::new(gpioa.pa5.into_alternate()),
+                Channel2::new(gpiob.pb3.into_alternate()),
+                Channel3::new(gpiob.pb10.into_alternate()),
+                Channel4::new(gpiob.pb11.into_alternate()),
             ),
             hertz_apb1,
             &clocks,
         );
         let mut tim3 = dp.TIM3.pwm_hz(
             (
-                Channel1::new(
-                    gpiob
-                        .pb4
-                        .into_push_pull_output_in_state(PinState::Low)
-                        .into_alternate(),
-                ),
-                Channel2::new(
-                    gpiob
-                        .pb5
-                        .into_push_pull_output_in_state(PinState::Low)
-                        .into_alternate(),
-                ),
-                Channel3::new(
-                    gpiob
-                        .pb0
-                        .into_push_pull_output_in_state(PinState::Low)
-                        .into_alternate(),
-                ),
-                Channel4::new(
-                    gpiob
-                        .pb1
-                        .into_push_pull_output_in_state(PinState::Low)
-                        .into_alternate(),
-                ),
+                Channel1::new(gpiob.pb4.into_alternate()),
+                Channel2::new(gpiob.pb5.into_alternate()),
+                Channel3::new(gpiob.pb0.into_alternate()),
+                Channel4::new(gpiob.pb1.into_alternate()),
             ),
             hertz_apb1,
             &clocks,
@@ -178,30 +121,10 @@ mod app {
 
         let mut tim4 = dp.TIM4.pwm_hz(
             (
-                Channel1::new(
-                    gpiob
-                        .pb6
-                        .into_push_pull_output_in_state(PinState::Low)
-                        .into_alternate(),
-                ),
-                Channel2::new(
-                    gpiob
-                        .pb7
-                        .into_push_pull_output_in_state(PinState::Low)
-                        .into_alternate(),
-                ),
-                Channel3::new(
-                    gpiod
-                        .pd14
-                        .into_push_pull_output_in_state(PinState::Low)
-                        .into_alternate(),
-                ),
-                Channel4::new(
-                    gpiod
-                        .pd15
-                        .into_push_pull_output_in_state(PinState::Low)
-                        .into_alternate(),
-                ),
+                Channel1::new(gpiob.pb6.into_alternate()),
+                Channel2::new(gpiob.pb7.into_alternate()),
+                Channel3::new(gpiod.pd14.into_alternate()),
+                Channel4::new(gpiod.pd15.into_alternate()),
             ),
             hertz_apb1,
             &clocks,
@@ -209,30 +132,10 @@ mod app {
 
         let mut tim5 = dp.TIM5.pwm_hz(
             (
-                Channel1::new(
-                    gpioa
-                        .pa0
-                        .into_push_pull_output_in_state(PinState::Low)
-                        .into_alternate(),
-                ),
-                Channel2::new(
-                    gpioa
-                        .pa1
-                        .into_push_pull_output_in_state(PinState::Low)
-                        .into_alternate(),
-                ),
-                Channel3::new(
-                    gpioa
-                        .pa2
-                        .into_push_pull_output_in_state(PinState::Low)
-                        .into_alternate(),
-                ),
-                Channel4::new(
-                    gpioa
-                        .pa3
-                        .into_push_pull_output_in_state(PinState::Low)
-                        .into_alternate(),
-                ),
+                Channel1::new(gpioa.pa0.into_alternate()),
+                Channel2::new(gpioa.pa1.into_alternate()),
+                Channel3::new(gpioa.pa2.into_alternate()),
+                Channel4::new(gpioa.pa3.into_alternate()),
             ),
             hertz_apb1,
             &clocks,
@@ -240,107 +143,47 @@ mod app {
 
         let mut tim8 = dp.TIM8.pwm_hz(
             (
-                Channel1::new(
-                    gpioc
-                        .pc6
-                        .into_push_pull_output_in_state(PinState::Low)
-                        .into_alternate(),
-                ),
-                Channel2::new(
-                    gpioc
-                        .pc7
-                        .into_push_pull_output_in_state(PinState::Low)
-                        .into_alternate(),
-                ),
-                Channel3::new(
-                    gpioc
-                        .pc8
-                        .into_push_pull_output_in_state(PinState::Low)
-                        .into_alternate(),
-                ),
-                Channel4::new(
-                    gpioc
-                        .pc9
-                        .into_push_pull_output_in_state(PinState::Low)
-                        .into_alternate(),
-                ),
+                Channel1::new(gpioc.pc6.into_alternate()),
+                Channel2::new(gpioc.pc7.into_alternate()),
+                Channel3::new(gpioc.pc8.into_alternate()),
+                Channel4::new(gpioc.pc9.into_alternate()),
             ),
             hertz_apb2,
             &clocks,
         );
         let mut tim9 = dp.TIM9.pwm_hz(
             (
-                Channel1::new(
-                    gpioe
-                        .pe5
-                        .into_push_pull_output_in_state(PinState::Low)
-                        .into_alternate(),
-                ),
-                Channel2::new(
-                    gpioe
-                        .pe6
-                        .into_push_pull_output_in_state(PinState::Low)
-                        .into_alternate(),
-                ),
+                Channel1::new(gpioe.pe5.into_alternate()),
+                Channel2::new(gpioe.pe6.into_alternate()),
             ),
             hertz_apb1,
             &clocks,
         );
         let mut tim10 = dp.TIM10.pwm_hz(
-            Channel1::new(
-                gpiob
-                    .pb8
-                    .into_push_pull_output_in_state(PinState::Low)
-                    .into_alternate(),
-            ),
+            Channel1::new(gpiob.pb8.into_alternate()),
             hertz_apb1,
             &clocks,
         );
         let mut tim11 = dp.TIM11.pwm_hz(
-            Channel1::new(
-                gpiob
-                    .pb9
-                    .into_push_pull_output_in_state(PinState::Low)
-                    .into_alternate(),
-            ),
+            Channel1::new(gpiob.pb9.into_alternate()),
             hertz_apb1,
             &clocks,
         );
         let mut tim12 = dp.TIM12.pwm_hz(
             (
-                Channel1::new(
-                    gpiob
-                        .pb14
-                        .into_push_pull_output_in_state(PinState::Low)
-                        .into_alternate(),
-                ),
-                Channel2::new(
-                    gpiob
-                        .pb15
-                        .into_push_pull_output_in_state(PinState::Low)
-                        .into_alternate(),
-                ),
+                Channel1::new(gpiob.pb14.into_alternate()),
+                Channel2::new(gpiob.pb15.into_alternate()),
             ),
             hertz_apb1,
             &clocks,
         );
         let mut tim13 = dp.TIM13.pwm_hz(
-            Channel1::new(
-                gpioa
-                    .pa6
-                    .into_push_pull_output_in_state(PinState::Low)
-                    .into_alternate(),
-            ),
+            Channel1::new(gpioa.pa6.into_alternate()),
             hertz_apb1,
             &clocks,
         );
         let mut tim14 = dp.TIM14.pwm_hz(
-            Channel1::new(
-                gpioa
-                    .pa7
-                    .into_push_pull_output_in_state(PinState::Low)
-                    .into_alternate(),
-            ),
+            Channel1::new(gpioa.pa7.into_alternate()),
             hertz_apb1,
             &clocks,
         );
@@ -417,12 +260,14 @@ mod app {
         _ = gpiod.pd~N.into_push_pull_output();
         });
 
-        let mut tim7 = dp.TIM7.counter_hz(&clocks);
+        frame_update::spawn(0, 0).ok();
 
-        tim7.start((16 * 8 * 3 * 120).Hz())
-            .expect("Unable to start frame clock");
+        // let mut tim7 = dp.TIM7.counter_hz(&clocks);
 
-        tim7.listen(Event::Update);
+        // tim7.start((row_update_rate).Hz())
+        //     .expect("Unable to start frame clock");
+
+        // tim7.listen(Event::Update);
 
         // rtic::pend(hal::pac::Interrupt::TIM7);
 
@@ -431,30 +276,25 @@ mod app {
                 frame_offset: 0,
                 buf: &FBPOOL[0],
             },
-            Local {
-                en: 0,
-                port: 0b00000000,
-                timer7: tim7,
-            },
+            Local {},
         )
     }
 
-    #[idle]
-    fn idle(_: idle::Context) -> ! {
-        loop {
-            // rprintln!("hehhe");
-            // rprintln!("Working");
-            // cortex_m::asm::wfi();
-        }
-    }
+    // #[idle]
+    // fn idle(_: idle::Context) -> ! {
+    //     loop {
+    //         // rprintln!("hehhe");
+    //         // rprintln!("Working");
+    //         // cortex_m::asm::wfi();
+    //     }
+    // }
 
-    #[task(binds = TIM7, shared=[frame_offset, &buf], local=[timer7, port, en])]
-    fn frame_update(ctx: frame_update::Context) {
+    // #[task(binds = TIM7, shared=[frame_offset, &buf], local=[timer7, port])]
+    #[task(shared=[&buf])]
+    async fn frame_update(ctx: frame_update::Context, frame_offset: usize, port: u8) {
         // rprintln!("Update");
 
-        let en = *ctx.local.en;
-        let port = *ctx.local.port;
-        let frame_offset = *ctx.shared.frame_offset;
+        // let frame_offset = *ctx.shared.frame_offset;
 
         // rprintln!("{} {:#08b} {}", frame_offset, port, en);
         let buf = ctx.shared.buf;
@@ -475,43 +315,75 @@ mod app {
         );
 
         unsafe {
+            let buf = *buf;
+            let fb_advanced = buf[(frame_offset + 128)..(frame_offset + 128 + 16)].iter();
+            let mut fb = buf[frame_offset..(frame_offset + 16)]
+                .iter()
+                .chain(fb_advanced)
+                .cycle();
+
+            //R
+            seq!(N in 0..12 {
+                (*timers.N).ccr.iter().for_each(|x| x.reset());
+            });
+
+            let port = (0b1111111 & port) as u32;
+
+            (*GPIOD::ptr()).odr.modify(|_, w| w.bits(0b10000000 | port));
+
+            seq!(N in 0..12 {
+                (*timers.N).ccr.iter().for_each(|x| {
+                    let temp = (*fb.next().unwrap_unchecked()) as u8;
+                    // rdbg!(&temp);
+                    x.write(|w| w.ccr().bits(temp.into()))
+                });
+            });
+
+            Systick::delay(651.micros()).await;
+
+            //G
             seq!(N in 0..12 {
                 (*timers.N).ccr.iter().for_each(|x| x.reset());
             });
 
             (*GPIOD::ptr())
                 .odr
-                .modify(|_, w| w.bits(((0b10000000 << (en >> 3)) | port & 0b1111111) as u32));
+                .modify(|_, w| w.bits(0b100000000 | port));
 
-            let buf = *buf;
-            let mut fb = buf[frame_offset..(frame_offset + 16)].iter();
-
-            seq!(N in 0..4 {
+            seq!(N in 0..12 {
                 (*timers.N).ccr.iter().for_each(|x| {
-                    let temp = (*fb.next().unwrap_unchecked() >> en) as u8;
+                    let temp = (*fb.next().unwrap_unchecked() >> 8) as u8;
                     // rdbg!(&temp);
                     x.write(|w| w.ccr().bits(temp.into()))
                 });
             });
 
-            let frame_offset = frame_offset + 128;
-            let mut fb = buf[frame_offset..(frame_offset + 16)].iter();
+            Systick::delay(651.micros()).await;
 
-            seq!(N in 4..12 {
+            //B
+            seq!(N in 0..12 {
+                (*timers.N).ccr.iter().for_each(|x| x.reset());
+            });
+
+            (*GPIOD::ptr())
+                .odr
+                .modify(|_, w| w.bits(0b1000000000 | port));
+
+            seq!(N in 0..12 {
                 (*timers.N).ccr.iter().for_each(|x| {
-                    x.write(|w| w.ccr().bits(((*fb.next().unwrap_unchecked() >> en) as u8).into()))
+                    let temp = (*fb.next().unwrap_unchecked() >> 16) as u8;
+                    // rdbg!(&temp);
+                    x.write(|w| w.ccr().bits(temp.into()))
                 });
             });
+
+            Systick::delay(651.micros()).await;
         }
 
-        *ctx.local.en = en + 8;
-        if en == 16 {
-            *ctx.local.en -= 24;
-            *ctx.local.port += 1;
-            let frame_offset = frame_offset + 16;
-            *ctx.shared.frame_offset = (16 * 16 * 16 - 1) & (frame_offset + (frame_offset & 128));
-        }
+        let frame_offset = frame_offset + 16;
+        let frame_offset = (16 * 16 * 16 - 1) & (frame_offset + (frame_offset & 128));
+        frame_update::spawn(frame_offset, port + 1).ok();
 
-        ctx.local.timer7.clear_interrupt(Event::Update);
+        // ctx.local.timer7.clear_interrupt(Event::Update);
     }
 }

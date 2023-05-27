@@ -36,7 +36,7 @@ mod app {
     use super::*;
 
     const fn image_load() -> [[u32; 16 * 16 * 16]; 2] {
-        let test = [[0u32; 16 * 16 * 16]; 2];
+        let test = [[0xFF7F00; 16 * 16 * 16]; 2];
         // test[0].copy_from_slice(include_bytes!(r"..\image.bmp").into());
         test
     }
@@ -346,69 +346,37 @@ mod app {
         );
 
         tim1.enable(C1);
-        tim1.set_polarity(C1, Polarity::ActiveLow);
         tim1.enable(C2);
-        tim1.set_polarity(C2, Polarity::ActiveLow);
         tim1.enable(C3);
-        tim1.set_polarity(C3, Polarity::ActiveLow);
         tim1.enable(C4);
-        tim1.set_polarity(C4, Polarity::ActiveLow);
         tim2.enable(C1);
-        tim2.set_polarity(C1, Polarity::ActiveLow);
         tim2.enable(C2);
-        tim2.set_polarity(C2, Polarity::ActiveLow);
         tim2.enable(C3);
-        tim2.set_polarity(C3, Polarity::ActiveLow);
         tim2.enable(C4);
-        tim2.set_polarity(C4, Polarity::ActiveLow);
         tim3.enable(C1);
-        tim3.set_polarity(C1, Polarity::ActiveLow);
         tim3.enable(C2);
-        tim3.set_polarity(C2, Polarity::ActiveLow);
         tim3.enable(C3);
-        tim3.set_polarity(C3, Polarity::ActiveLow);
         tim3.enable(C4);
-        tim3.set_polarity(C4, Polarity::ActiveLow);
         tim4.enable(C1);
-        tim4.set_polarity(C1, Polarity::ActiveLow);
         tim4.enable(C2);
-        tim4.set_polarity(C2, Polarity::ActiveLow);
         tim4.enable(C3);
-        tim4.set_polarity(C3, Polarity::ActiveLow);
         tim4.enable(C4);
-        tim4.set_polarity(C4, Polarity::ActiveLow);
         tim5.enable(C1);
-        tim5.set_polarity(C1, Polarity::ActiveLow);
         tim5.enable(C2);
-        tim5.set_polarity(C2, Polarity::ActiveLow);
         tim5.enable(C3);
-        tim5.set_polarity(C3, Polarity::ActiveLow);
         tim5.enable(C4);
-        tim5.set_polarity(C4, Polarity::ActiveLow);
         tim8.enable(C1);
-        tim8.set_polarity(C1, Polarity::ActiveLow);
         tim8.enable(C2);
-        tim8.set_polarity(C2, Polarity::ActiveLow);
         tim8.enable(C3);
-        tim8.set_polarity(C3, Polarity::ActiveLow);
         tim8.enable(C4);
-        tim8.set_polarity(C4, Polarity::ActiveLow);
         tim9.enable(C1);
-        tim9.set_polarity(C1, Polarity::ActiveLow);
         tim9.enable(C2);
-        tim9.set_polarity(C2, Polarity::ActiveLow);
         tim10.enable(C1);
-        tim10.set_polarity(C1, Polarity::ActiveLow);
         tim11.enable(C1);
-        tim11.set_polarity(C1, Polarity::ActiveLow);
         tim12.enable(C1);
-        tim12.set_polarity(C1, Polarity::ActiveLow);
         tim12.enable(C2);
-        tim12.set_polarity(C2, Polarity::ActiveLow);
         tim13.enable(C1);
-        tim13.set_polarity(C1, Polarity::ActiveLow);
         tim14.enable(C1);
-        tim14.set_polarity(C1, Polarity::ActiveLow);
 
         // tim13.set_polarity(C1, hal::timer::Polarity::ActiveLow);
         // tim13.enable(C1);
@@ -419,7 +387,7 @@ mod app {
 
         let mut tim7 = dp.TIM7.counter_hz(&clocks);
 
-        tim7.start((16 * 8 * 3 * 120).Hz())
+        tim7.start((16 * 8 * 3 * 2).Hz())
             .expect("Unable to start frame clock");
 
         tim7.listen(Event::Update);
@@ -483,8 +451,11 @@ mod app {
                 .odr
                 .modify(|_, w| w.bits(((0b10000000 << (en >> 3)) | port & 0b1111111) as u32));
 
+            // rdbg!(&port);
+
             let buf = *buf;
-            let mut fb = buf[frame_offset..(frame_offset + 16)].iter();
+            let mut fb = buf[frame_offset..(frame_offset + 16)].into_iter();
+            rprintln!("en{} port{}", &en, &port);
 
             seq!(N in 0..4 {
                 (*timers.N).ccr.iter().for_each(|x| {
@@ -495,7 +466,7 @@ mod app {
             });
 
             let frame_offset = frame_offset + 128;
-            let mut fb = buf[frame_offset..(frame_offset + 16)].iter();
+            let mut fb = buf[frame_offset..(frame_offset + 16)].into_iter();
 
             seq!(N in 4..12 {
                 (*timers.N).ccr.iter().for_each(|x| {

@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 cortex-m = { version = "0.7.7", features = ["inline-asm"] }
 cortex-m-rt = "0.7.3"
+embedded-graphics = "0.8.0"
 nb = "1.1.0"
 panic-probe = { version = "0.3.1", features = ["rtt-target"] }
 rtic = { version = "2.0.0-alpha.2", features = ["cortex-m", "thumbv7-backend"] }
@@ -18,7 +19,7 @@ tinybmp = "0.5.0"
 tuple-iter = "0.1.0"
 
 [profile.release]
-# debug = false
-# lto = true
-# codegen-units = 1
-# panic = "abort"
+debug = false
+lto = true
+codegen-units = 1
+panic = "abort"

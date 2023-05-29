@@ -1,10 +1,11 @@
 #![no_std]
 #![feature(wrapping_next_power_of_two)]
 #![feature(type_alias_impl_trait)]
+#![feature(atomic_from_mut)]
 #![no_main]
 
 use panic_probe as _;
-use rtt_target::{rprintln, rtt_init_print};
+use rtt_target::{rprint, rprintln, rtt_init_print};
 
 use hal::gpio::GpioExt;
 use hal::prelude::*;
@@ -18,19 +19,24 @@ use embedded_graphics::{draw_target::*, pixelcolor::Rgb888, prelude::*, primitiv
 mod app {
 
     use core::{
-        fmt::Formatter,
+        fmt::{write, Formatter},
         iter::{Cycle, Flatten, Skip, StepBy},
         slice::{ChunksExact, Iter},
+        sync::atomic::{AtomicPtr, AtomicU8, AtomicUsize},
     };
 
+    use embedded_graphics::{
+        mono_font::{iso_8859_10::FONT_4X6, MonoTextStyle},
+        text::Text,
+    };
     use hal::{
         gpio::PinState,
         pac::{
-            GPIOD, TIM1, TIM10, TIM11, TIM12, TIM13, TIM14, TIM2, TIM3, TIM4, TIM5, TIM7, TIM8,
-            TIM9,
+            GPIOD, TIM1, TIM10, TIM11, TIM12, TIM13, TIM14, TIM2, TIM3, TIM4, TIM5, TIM6, TIM7,
+            TIM8, TIM9,
         },
         timer::Channel::*,
-        timer::{Channel1, Polarity, PwmChannel},
+        timer::{Channel1, CounterUs, Polarity, PwmChannel},
         timer::{Channel2, PwmHz},
         timer::{Channel3, Event},
         timer::{Channel4, CounterHz},
@@ -45,8 +51,6 @@ mod app {
     //     test
     // }
 
-    static mut FBPOOL: [[u8; 16 * 16 * 16 * 4]; 2] = [[0; 16 * 16 * 16 * 4]; 2];
-
     #[shared]
     struct Shared {
         // #[lock_free]
@@ -57,16 +61,22 @@ mod app {
         // fbd: Cycle<Flatten<StepBy<Skip<ChunksExact<'static, u32>>>>>,
     }
 
+    #[derive(Debug)]
     pub struct Graphics {
-        frame_offset: usize,
-        buf: &'static mut [u8],
-        buf2: &'static mut [u8],
-        layer: u8,
+        fbpool: &'static mut [AtomicU8],
+        frame_offset: AtomicUsize,
+        buf: AtomicUsize,
+        buf2: AtomicUsize,
+        layer: AtomicU8,
     }
 
     impl Graphics {
         pub fn flush(&mut self) {
-            while self.frame_offset != 0 {}
+            while self
+                .frame_offset
+                .load(core::sync::atomic::Ordering::Relaxed)
+                != 0
+            {}
             core::mem::swap(&mut self.buf, &mut self.buf2);
         }
     }
@@ -87,32 +97,56 @@ mod app {
         {
             for Pixel(coord, color) in pixels.into_iter() {
                 let (x, y) = coord.into();
-                self.buf2[((self.layer as usize) * 1024)
-                    + ((x as usize) & (16 - 1))
-                    + (((y as usize) & (16 - 1)) * 64)
-                    + 0] = color.r();
-                self.buf2[((self.layer as usize) * 1024)
-                    + ((x as usize) & (16 - 1))
-                    + (((y as usize) & (16 - 1)) * 64)
-                    + 16] = color.g();
-                self.buf2[((self.layer as usize) * 1024)
-                    + ((x as usize) & (16 - 1))
-                    + (((y as usize) & (16 - 1)) * 64)
-                    + 32] = color.b();
+                // let (x, y) = rdbg!(coord.into());
+                let layer = self.layer.load(core::sync::atomic::Ordering::Relaxed) as usize;
+                let buf = self.fbpool.as_mut();
+                let off = self.buf2.load(core::sync::atomic::Ordering::Relaxed);
+                let pos =
+                    (layer * 1024) + ((x as usize) & (16 - 1)) + ((y as usize) & (16 - 1)) * 64;
+                buf[off + pos + 0] = color.r().into();
+                buf[off + pos + 16] = color.g().into();
+                buf[off + pos + 32] = color.b().into();
+                // self.buf2[(layer * 1024)
+                //     + ((x as usize) & (16 - 1))
+                //     + (((y as usize) & (16 - 1)) * 64)
+                //     + 0] = color.r();
+                // self.buf2[(layer * 1024)
+                //     + ((x as usize) & (16 - 1))
+                //     + (((y as usize) & (16 - 1)) * 64)
+                //     + 16] = color.g();
+                // self.buf2[(layer * 1024)
+                //     + ((x as usize) & (16 - 1))
+                //     + (((y as usize) & (16 - 1)) * 64)
+                //     + 32] = color.b();
             }
             Ok(())
         }
 
-        fn fill_solid(&mut self, area: &Rectangle, color: Self::Color) -> Result<(), Self::Error> {
-            let (x, y) = area.top_left.into();
-            let (w, h) = area.size.into();
+        // fn fill_solid(&mut self, area: &Rectangle, color: Self::Color) -> Result<(), Self::Error> {
+        //     let (x, y) = area.top_left.into();
+        //     let (w, h) = area.size.into();
 
-            Ok(())
-        }
+        //     Ok(())
+        // }
     }
 
     impl core::fmt::Display for Graphics {
         fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+            self.fbpool
+                .chunks(16)
+                .skip(16 * 16 * 4)
+                .step_by(4)
+                .take(16)
+                .for_each(|x| {
+                    x.iter().for_each(|b| {
+                        if b.load(core::sync::atomic::Ordering::Relaxed) > 0 {
+                            write!(f, "• ").ok();
+                        } else {
+                            write!(f, "◦ ").ok();
+                        }
+                    });
+                    write!(f, "\n").ok();
+                });
             Ok(())
         }
     }
@@ -157,12 +191,13 @@ mod app {
             PwmChannel<TIM14, 0, false>,
         ),
         timer7: CounterHz<TIM7>,
+        timer6: CounterUs<TIM6>,
     }
 
     /// STM32 Init code
     #[init]
     fn init(ctx: init::Context) -> (Shared, Local) {
-        rtt_init_print!();
+        rtt_init_print!(NoBlockSkip, 4096);
 
         rprintln!("STM32 LED CUBE");
 
@@ -179,8 +214,8 @@ mod app {
 
         //256 ARR
         // APB1 operates at 168/2 MHz whereas APB2 operates at 168 MHz
-        let hertz_apb1 = (clocks.hclk().raw() >> 9).Hz();
-        let hertz_apb2 = (clocks.hclk().raw() >> 8).Hz();
+        let hertz_apb1 = (clocks.hclk().raw() >> 8).Hz();
+        let hertz_apb2 = (clocks.hclk().raw() >> 9).Hz();
 
         let t1 = dp
             .TIM1
@@ -332,71 +367,109 @@ mod app {
         // // tim13.enable(C1);
 
         seq!(N in 3..13{
-            gpiod.pd~N.into_push_pull_output_in_state(PinState::Low);
+            _ = gpiod.pd~N.into_push_pull_output_in_state(PinState::Low).set_speed(hal::gpio::Speed::VeryHigh);
         });
 
         let mut t7 = dp.TIM7.counter_hz(&clocks);
 
-        t7.start((16 * 8 * 3 * 2).Hz())
+        t7.start((16 * 8 * 3 * 120).Hz())
             .expect("Unable to start frame clock");
 
         t7.listen(Event::Update);
 
         // rtic::pend(hal::pac::Interrupt::TIM7);
 
+        static mut BUF: [u8; 16 * 16 * 16 * 4 * 2] = [0xFFu8; 16 * 16 * 16 * 4 * 2];
+        let test = AtomicU8::from_mut_slice(unsafe { &mut BUF });
         let mut graphics = Graphics {
-            frame_offset: 0,
-            buf: unsafe { &mut FBPOOL[0] },
-            buf2: unsafe { &mut FBPOOL[1] },
-            layer: 0,
+            frame_offset: AtomicUsize::new(0),
+            buf: AtomicUsize::new(0),
+            buf2: AtomicUsize::new(16 * 16 * 16 * 4),
+            layer: AtomicU8::new(0),
+            fbpool: test,
+            // buf: fbpoo,
+            // buf2: unsafe { &mut FBPOOL[1] },
+            // layer: 0,
         };
 
-        Circle::new(Point::new(7, 7), 4)
-            .into_styled(PrimitiveStyle::with_stroke(Rgb888::WHITE, 1))
-            .draw(&mut graphics)
-            .ok();
+        // Circle::new(Point::new(5, 5), 2)
+        //     .into_styled(PrimitiveStyle::with_stroke(Rgb888::WHITE, 1))
+        //     .draw(&mut graphics)
+        //     .unwrap();
 
-        draw::spawn().ok();
+        let style = MonoTextStyle::new(&FONT_4X6, Rgb888::WHITE);
+
+        Text::new("HeHe", Point::new(0, 6), style)
+            .draw(&mut graphics)
+            .unwrap();
+
+        // Pixel(Point::new(0, 0), Rgb888::WHITE)
+        //     .draw(&mut graphics)
+        //     .unwrap();
+        // graphics.draw_iter([])
+
+        // Rectangle::new(Point::new(0, 0), Size::new(16, 16))
+        //     .into_styled(PrimitiveStyle::with_fill(Rgb888::WHITE))
+        //     .draw(&mut graphics)
+        //     .ok();
+
+        rprintln!("{}", graphics);
+
+        graphics.flush();
+
+        let timer6 = dp.TIM6.counter_us(&clocks);
+
+        // draw::spawn().ok();
         (
             Shared { graphics },
             Local {
+                timer6,
                 pwm_channels: channels,
-                en: 0,
+                en: 0b1000000,
                 port: 0b00000000,
                 timer7: t7,
             },
         )
     }
 
-    // #[idle]
-    // fn idle(_: idle::Context) -> ! {
-    //     // ctx.shared.buf.lock(|buf| {
-    //     //     buf.iter_mut().enumerate().for_each(|(i, w)| *w = i as u8);
-    //     // });
+    #[idle(shared=[&graphics])]
+    fn idle(_: idle::Context) -> ! {
+        // ctx.shared.buf.lock(|buf| {
+        //     buf.iter_mut().enumerate().for_each(|(i, w)| *w = i as u8);
+        // });
 
-    //     loop {
-    //         // rprintln!("hehhe");
-    //         // rprintln!("Working");
-    //         cortex_m::asm::wfi();
-    //     }
-    // }
-
-    #[task(shared=[graphics])]
-    async fn draw(_: draw::Context) {
-        // _ = ctx.shared.graphics;
+        loop {
+            // rprintln!("hehhe");
+            // rprintln!("Working");
+            // cortex_m::asm::wfi();
+        }
     }
 
-    #[task(binds = TIM7, shared=[graphics], local=[pwm_channels, timer7, port, en], priority=1)]
+    // #[task(shared=[&graphics])]
+    // async fn draw(_: draw::Context) {
+    //     // _ = ctx.shared.graphics;
+    // }
+
+    #[task(binds = TIM7, shared=[&graphics], local=[timer6, pwm_channels, timer7, port, en])]
     fn frame_update(ctx: frame_update::Context) {
         // rprintln!("Update");
-        let graphics = ctx.shared.graphics.lock(|l| *l);
+        // let timer6 = ctx.local.timer6;
+        // timer6.start(2.micros()).unwrap();
+        let graphics = ctx.shared.graphics;
 
         let temp_en = *ctx.local.en;
         let en = ((temp_en << 1) | (temp_en >> 2)) & 0b1110000;
         *ctx.local.en = en;
-        let frame_offset = graphics.frame_offset;
+        let frame_offset = ctx
+            .shared
+            .graphics
+            .frame_offset
+            .load(core::sync::atomic::Ordering::Relaxed);
         let frame_offset = frame_offset + (frame_offset & (16 * 8 * 4));
-        graphics.frame_offset = frame_offset + ((en & 64) as usize);
+        ctx.shared.graphics.frame_offset.store(
+            frame_offset + ((en & 64) as usize),
+            core::sync::atomic::Ordering::Relaxed,
+        );
         let frame_offset = (frame_offset + (en & 0b110000) as usize) & (16384 - 1);
         // rprintln!("{} {:#08b} {}", frame_offset, port, en);
 
@@ -410,14 +483,20 @@ mod app {
             });
         }
 
-        let buf = &graphics.buf;
+        let buf = &graphics.fbpool;
+        let frame_offset = graphics.buf.load(core::sync::atomic::Ordering::Relaxed) + frame_offset;
         let fb = buf[frame_offset..(frame_offset + 16)].iter();
         let frame_offset = frame_offset + 16 * 8 * 4;
         let mut fb = fb.chain(buf[frame_offset..(frame_offset + 16)].iter());
 
         seq!(N in 0..32{
-            ctx.local.pwm_channels.N.set_duty(*fb.next().unwrap_or(&0) as u16);
+            ctx.local.pwm_channels.N.set_duty(fb.next().map_or(0, |v| v.load(core::sync::atomic::Ordering::Relaxed)) as u16);
         });
+
+        // let duration = timer6.now().duration_since_epoch();
+        // timer6.cancel().unwrap();
+
+        // rprintln!("Timer elasped {}", duration);
 
         ctx.local.timer7.clear_interrupt(Event::Update);
     }

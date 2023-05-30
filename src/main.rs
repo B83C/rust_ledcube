@@ -221,10 +221,20 @@ mod app {
             .TIM1
             .pwm_hz(
                 (
-                    Channel1::new(gpioa.pa8.into_alternate()),
-                    Channel2::new(gpioa.pa9.into_alternate()),
-                    Channel3::new(gpioa.pa10.into_alternate()),
-                    Channel4::new(gpioe.pe14.into_alternate()),
+                    Channel1::new(gpioa.pa8.into_alternate().speed(hal::gpio::Speed::VeryHigh)),
+                    Channel2::new(gpioa.pa9.into_alternate().speed(hal::gpio::Speed::VeryHigh)),
+                    Channel3::new(
+                        gpioa
+                            .pa10
+                            .into_alternate()
+                            .speed(hal::gpio::Speed::VeryHigh),
+                    ),
+                    Channel4::new(
+                        gpioe
+                            .pe14
+                            .into_alternate()
+                            .speed(hal::gpio::Speed::VeryHigh),
+                    ),
                 ),
                 hertz_apb2,
                 &clocks,
@@ -234,10 +244,20 @@ mod app {
             .TIM2
             .pwm_hz(
                 (
-                    Channel1::new(gpioa.pa5.into_alternate()),
-                    Channel2::new(gpiob.pb3.into_alternate()),
-                    Channel3::new(gpiob.pb10.into_alternate()),
-                    Channel4::new(gpiob.pb11.into_alternate()),
+                    Channel1::new(gpioa.pa5.into_alternate().speed(hal::gpio::Speed::VeryHigh)),
+                    Channel2::new(gpiob.pb3.into_alternate().speed(hal::gpio::Speed::VeryHigh)),
+                    Channel3::new(
+                        gpiob
+                            .pb10
+                            .into_alternate()
+                            .speed(hal::gpio::Speed::VeryHigh),
+                    ),
+                    Channel4::new(
+                        gpiob
+                            .pb11
+                            .into_alternate()
+                            .speed(hal::gpio::Speed::VeryHigh),
+                    ),
                 ),
                 hertz_apb1,
                 &clocks,
@@ -247,10 +267,10 @@ mod app {
             .TIM3
             .pwm_hz(
                 (
-                    Channel1::new(gpiob.pb4.into_alternate()),
-                    Channel2::new(gpiob.pb5.into_alternate()),
-                    Channel3::new(gpiob.pb0.into_alternate()),
-                    Channel4::new(gpiob.pb1.into_alternate()),
+                    Channel1::new(gpiob.pb4.into_alternate().speed(hal::gpio::Speed::VeryHigh)),
+                    Channel2::new(gpiob.pb5.into_alternate().speed(hal::gpio::Speed::VeryHigh)),
+                    Channel3::new(gpiob.pb0.into_alternate().speed(hal::gpio::Speed::VeryHigh)),
+                    Channel4::new(gpiob.pb1.into_alternate().speed(hal::gpio::Speed::VeryHigh)),
                 ),
                 hertz_apb1,
                 &clocks,
@@ -261,10 +281,20 @@ mod app {
             .TIM4
             .pwm_hz(
                 (
-                    Channel1::new(gpiob.pb6.into_alternate()),
-                    Channel2::new(gpiob.pb7.into_alternate()),
-                    Channel3::new(gpiod.pd14.into_alternate()),
-                    Channel4::new(gpiod.pd15.into_alternate()),
+                    Channel1::new(gpiob.pb6.into_alternate().speed(hal::gpio::Speed::VeryHigh)),
+                    Channel2::new(gpiob.pb7.into_alternate().speed(hal::gpio::Speed::VeryHigh)),
+                    Channel3::new(
+                        gpiod
+                            .pd14
+                            .into_alternate()
+                            .speed(hal::gpio::Speed::VeryHigh),
+                    ),
+                    Channel4::new(
+                        gpiod
+                            .pd15
+                            .into_alternate()
+                            .speed(hal::gpio::Speed::VeryHigh),
+                    ),
                 ),
                 hertz_apb1,
                 &clocks,
@@ -275,10 +305,10 @@ mod app {
             .TIM5
             .pwm_hz(
                 (
-                    Channel1::new(gpioa.pa0.into_alternate()),
-                    Channel2::new(gpioa.pa1.into_alternate()),
-                    Channel3::new(gpioa.pa2.into_alternate()),
-                    Channel4::new(gpioa.pa3.into_alternate()),
+                    Channel1::new(gpioa.pa0.into_alternate().speed(hal::gpio::Speed::VeryHigh)),
+                    Channel2::new(gpioa.pa1.into_alternate().speed(hal::gpio::Speed::VeryHigh)),
+                    Channel3::new(gpioa.pa2.into_alternate().speed(hal::gpio::Speed::VeryHigh)),
+                    Channel4::new(gpioa.pa3.into_alternate().speed(hal::gpio::Speed::VeryHigh)),
                 ),
                 hertz_apb1,
                 &clocks,
@@ -289,10 +319,10 @@ mod app {
             .TIM8
             .pwm_hz(
                 (
-                    Channel1::new(gpioc.pc6.into_alternate()),
-                    Channel2::new(gpioc.pc7.into_alternate()),
-                    Channel3::new(gpioc.pc8.into_alternate()),
-                    Channel4::new(gpioc.pc9.into_alternate()),
+                    Channel1::new(gpioc.pc6.into_alternate().speed(hal::gpio::Speed::VeryHigh)),
+                    Channel2::new(gpioc.pc7.into_alternate().speed(hal::gpio::Speed::VeryHigh)),
+                    Channel3::new(gpioc.pc8.into_alternate().speed(hal::gpio::Speed::VeryHigh)),
+                    Channel4::new(gpioc.pc9.into_alternate().speed(hal::gpio::Speed::VeryHigh)),
                 ),
                 hertz_apb2,
                 &clocks,
@@ -302,8 +332,8 @@ mod app {
             .TIM9
             .pwm_hz(
                 (
-                    Channel1::new(gpioe.pe5.into_alternate()),
-                    Channel2::new(gpioe.pe6.into_alternate()),
+                    Channel1::new(gpioe.pe5.into_alternate().speed(hal::gpio::Speed::VeryHigh)),
+                    Channel2::new(gpioe.pe6.into_alternate().speed(hal::gpio::Speed::VeryHigh)),
                 ),
                 hertz_apb1,
                 &clocks,
@@ -312,7 +342,7 @@ mod app {
         let t10 = dp
             .TIM10
             .pwm_hz(
-                Channel1::new(gpiob.pb8.into_alternate()),
+                Channel1::new(gpiob.pb8.into_alternate().speed(hal::gpio::Speed::VeryHigh)),
                 hertz_apb1,
                 &clocks,
             )
@@ -320,7 +350,7 @@ mod app {
         let t11 = dp
             .TIM11
             .pwm_hz(
-                Channel1::new(gpiob.pb9.into_alternate()),
+                Channel1::new(gpiob.pb9.into_alternate().speed(hal::gpio::Speed::VeryHigh)),
                 hertz_apb1,
                 &clocks,
             )
@@ -329,8 +359,18 @@ mod app {
             .TIM12
             .pwm_hz(
                 (
-                    Channel1::new(gpiob.pb14.into_alternate()),
-                    Channel2::new(gpiob.pb15.into_alternate()),
+                    Channel1::new(
+                        gpiob
+                            .pb14
+                            .into_alternate()
+                            .speed(hal::gpio::Speed::VeryHigh),
+                    ),
+                    Channel2::new(
+                        gpiob
+                            .pb15
+                            .into_alternate()
+                            .speed(hal::gpio::Speed::VeryHigh),
+                    ),
                 ),
                 hertz_apb1,
                 &clocks,
@@ -339,7 +379,7 @@ mod app {
         let t13 = dp
             .TIM13
             .pwm_hz(
-                Channel1::new(gpioa.pa6.into_alternate()),
+                Channel1::new(gpioa.pa6.into_alternate().speed(hal::gpio::Speed::VeryHigh)),
                 hertz_apb1,
                 &clocks,
             )
@@ -347,7 +387,7 @@ mod app {
         let t14 = dp
             .TIM14
             .pwm_hz(
-                Channel1::new(gpioa.pa7.into_alternate()),
+                Channel1::new(gpioa.pa7.into_alternate().speed(hal::gpio::Speed::VeryHigh)),
                 hertz_apb1,
                 &clocks,
             )

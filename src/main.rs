@@ -36,7 +36,7 @@ mod app {
             TIM8, TIM9,
         },
         timer::Channel::*,
-        timer::{Channel1, CounterUs, Polarity, PwmChannel},
+        timer::{Channel1, CounterUs, DelayUs, Polarity, PwmChannel},
         timer::{Channel2, PwmHz},
         timer::{Channel3, Event},
         timer::{Channel4, CounterHz},
@@ -191,7 +191,7 @@ mod app {
             PwmChannel<TIM14, 0, false>,
         ),
         timer7: CounterHz<TIM7>,
-        timer6: CounterUs<TIM6>,
+        timer6: DelayUs<TIM6>,
     }
 
     /// STM32 Init code
@@ -406,13 +406,13 @@ mod app {
         // // tim13.set_polarity(C1, hal::timer::Polarity::ActiveLow);
         // // tim13.enable(C1);
 
-        seq!(N in 3..13{
+        seq!(N in 3..=13{
             _ = gpiod.pd~N.into_push_pull_output_in_state(PinState::Low).set_speed(hal::gpio::Speed::VeryHigh);
         });
 
         let mut t7 = dp.TIM7.counter_hz(&clocks);
 
-        t7.start((16 * 8 * 3 * 120).Hz())
+        t7.start((16 * 8 * 1).Hz())
             .expect("Unable to start frame clock");
 
         t7.listen(Event::Update);
@@ -457,7 +457,7 @@ mod app {
 
         graphics.flush();
 
-        let timer6 = dp.TIM6.counter_us(&clocks);
+        let timer6 = dp.TIM6.delay_us(&clocks);
 
         // draw::spawn().ok();
         (
@@ -517,10 +517,11 @@ mod app {
             ctx.local.pwm_channels.N.set_duty(0);
         });
 
+        let intercept = (((en >> 1) as usize) | (frame_offset & 0b11110111000000)) as u32;
+        // rprintln!("{}", frame_offset >> 10);
+        ctx.local.timer6.delay(2.micros());
         unsafe {
-            (*GPIOD::ptr()).odr.modify(|_, w| {
-                w.bits((((en >> 1) as usize) | (frame_offset & 0b1111111000000)) as u32)
-            });
+            (*GPIOD::ptr()).odr.modify(|_, w| w.bits(intercept));
         }
 
         let buf = &graphics.fbpool;
